@@ -8,10 +8,34 @@ type UserInfo = {
   email: string | null
 }
 
+type Room = {
+  id: string
+  name: string
+  created_at: string
+}
+
 export default function DashboardPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null)
+  const [roomName, setRoomName] = useState('')
+  const [rooms, setRooms] = useState<Room[]>([])
+
+  const fetchRooms = async () => {
+    const { data, error } = await supabase
+      .from('rooms')
+      .select('*')
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      console.error('Fetch rooms error:', error.message)
+      return
+    }
+
+    if (data) {
+      setRooms(data)
+    }
+  }
 
   useEffect(() => {
     const checkSession = async () => {
@@ -27,6 +51,8 @@ export default function DashboardPage() {
       setUserInfo({
         email: session.user.email ?? null,
       })
+
+      await fetchRooms()
       setLoading(false)
     }
 
@@ -36,6 +62,27 @@ export default function DashboardPage() {
   const handleLogout = async () => {
     await supabase.auth.signOut()
     router.replace('/login')
+  }
+
+  const createRoom = async () => {
+    if (!roomName.trim()) return
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+
+    const { error } = await supabase.from('rooms').insert({
+      name: roomName.trim(),
+      created_by: session?.user.id ?? null,
+    })
+
+    if (error) {
+      alert(`Gagal buat room: ${error.message}`)
+      return
+    }
+
+    setRoomName('')
+    await fetchRooms()
   }
 
   if (loading) {
@@ -67,6 +114,58 @@ export default function DashboardPage() {
       >
         Logout
       </button>
+
+      <div style={{ marginTop: 32 }}>
+        <h2>Buat Room</h2>
+
+        <input
+          value={roomName}
+          onChange={(e) => setRoomName(e.target.value)}
+          placeholder="Nama meeting"
+          style={{
+            padding: 10,
+            marginRight: 10,
+            border: '1px solid #ccc',
+            borderRadius: 8,
+          }}
+        />
+
+        <button
+          onClick={createRoom}
+          style={{
+            padding: '10px 14px',
+            borderRadius: 8,
+            border: '1px solid #ccc',
+            cursor: 'pointer',
+            background: 'white',
+          }}
+        >
+          Create Room
+        </button>
+      </div>
+
+      <div style={{ marginTop: 32 }}>
+        <h2>Daftar Room</h2>
+
+        {rooms.length === 0 ? (
+          <p>Belum ada room.</p>
+        ) : (
+          rooms.map((room) => (
+            <div
+              key={room.id}
+              style={{
+                marginBottom: 12,
+                padding: 12,
+                border: '1px solid #ddd',
+                borderRadius: 8,
+              }}
+            >
+              <strong>{room.name}</strong>
+              <div style={{ fontSize: 12, marginTop: 4 }}>{room.id}</div>
+            </div>
+          ))
+        )}
+      </div>
     </main>
   )
 }
