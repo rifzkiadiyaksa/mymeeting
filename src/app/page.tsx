@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase/client'
+import { supabase } from '../lib/supabase/client'
 
 export default async function Home() {
   const { data, error } = await supabase.auth.getSession()
