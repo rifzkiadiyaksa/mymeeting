@@ -7,12 +7,11 @@ import { supabase } from '../../lib/supabase/client'
 export default function LoginPage() {
   const router = useRouter()
   const [email, setEmail] = useState('')
+  const [token, setToken] = useState('')
   const [message, setMessage] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [debugResult, setDebugResult] = useState('')
-
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  const [loadingSend, setLoadingSend] = useState(false)
+  const [loadingVerify, setLoadingVerify] = useState(false)
+  const [otpSent, setOtpSent] = useState(false)
 
   useEffect(() => {
     const checkSession = async () => {
@@ -28,72 +27,63 @@ export default function LoginPage() {
     checkSession()
   }, [router])
 
-  const testOtpDirect = async () => {
-    setDebugResult('Testing direct POST /auth/v1/otp ...')
-
-    try {
-      const res = await fetch(`${supabaseUrl}/auth/v1/otp`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          apikey: supabaseKey,
-        },
-        body: JSON.stringify({
-          email,
-          create_user: true,
-          gotrue_meta_security: {},
-          code_challenge_method: 's256',
-          data: {},
-        }),
-      })
-
-      const text = await res.text()
-      setDebugResult(`otp status=${res.status}\n${text}`)
-      console.log('direct otp response', res.status, text)
-    } catch (err) {
-      console.error('direct otp failed', err)
-      setDebugResult(
-        `direct otp failed: ${err instanceof Error ? err.message : 'Unknown error'}`
-      )
-    }
-  }
-
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
+    setLoadingSend(true)
     setMessage('')
 
     try {
-      const { data, error } = await supabase.auth.signInWithOtp({
+      const { error } = await supabase.auth.signInWithOtp({
         email,
-        options: {
-          emailRedirectTo: 'https://meet.rifzki.my.id/dashboard',
-        },
       })
 
-      console.log('OTP response:', { data, error })
-
       if (error) {
-        setMessage(`Login gagal: ${error.message}`)
+        setMessage(`Gagal kirim OTP: ${error.message}`)
       } else {
-        setMessage('Magic link sudah dikirim. Cek email kamu.')
+        setOtpSent(true)
+        setMessage('Kode OTP sudah dikirim. Cek email kamu.')
       }
     } catch (err) {
-      console.error('Unexpected login error:', err)
       setMessage(
-        `Login gagal: ${err instanceof Error ? err.message : 'Unknown error'}`
+        `Gagal kirim OTP: ${err instanceof Error ? err.message : 'Unknown error'}`
       )
     }
 
-    setLoading(false)
+    setLoadingSend(false)
+  }
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoadingVerify(true)
+    setMessage('')
+
+    try {
+      const { error } = await supabase.auth.verifyOtp({
+        email,
+        token,
+        type: 'email',
+      })
+
+      if (error) {
+        setMessage(`Verifikasi gagal: ${error.message}`)
+      } else {
+        router.replace('/dashboard')
+      }
+    } catch (err) {
+      setMessage(
+        `Verifikasi gagal: ${err instanceof Error ? err.message : 'Unknown error'}`
+      )
+    }
+
+    setLoadingVerify(false)
   }
 
   return (
-    <main style={{ padding: 40, maxWidth: 560 }}>
+    <main style={{ padding: 40, maxWidth: 480 }}>
       <h1>Login</h1>
-      <p>Masuk ke My Meeting App pakai email.</p>
+      <p>Masuk ke My Meeting App pakai kode OTP email.</p>
 
-      <form onSubmit={handleLogin} style={{ marginTop: 20 }}>
+      <form onSubmit={handleSendOtp} style={{ marginTop: 20 }}>
         <input
           type="email"
           placeholder="email@contoh.com"
@@ -109,10 +99,40 @@ export default function LoginPage() {
           }}
         />
 
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+        <button
+          type="submit"
+          disabled={loadingSend}
+          style={{
+            padding: '12px 16px',
+            borderRadius: 8,
+            border: 'none',
+            cursor: 'pointer',
+          }}
+        >
+          {loadingSend ? 'Mengirim...' : 'Kirim OTP'}
+        </button>
+      </form>
+
+      {otpSent && (
+        <form onSubmit={handleVerifyOtp} style={{ marginTop: 24 }}>
+          <input
+            type="text"
+            placeholder="Masukkan 6 digit OTP"
+            value={token}
+            onChange={(e) => setToken(e.target.value)}
+            required
+            style={{
+              width: '100%',
+              padding: 12,
+              marginBottom: 12,
+              border: '1px solid #ccc',
+              borderRadius: 8,
+            }}
+          />
+
           <button
             type="submit"
-            disabled={loading}
+            disabled={loadingVerify}
             style={{
               padding: '12px 16px',
               borderRadius: 8,
@@ -120,43 +140,12 @@ export default function LoginPage() {
               cursor: 'pointer',
             }}
           >
-            {loading ? 'Mengirim...' : 'Kirim Magic Link'}
+            {loadingVerify ? 'Verifying...' : 'Verify OTP'}
           </button>
-
-          <button
-            type="button"
-            onClick={testOtpDirect}
-            style={{
-              padding: '12px 16px',
-              borderRadius: 8,
-              border: '1px solid #ccc',
-              cursor: 'pointer',
-              background: 'white',
-            }}
-          >
-            Test Direct OTP
-          </button>
-        </div>
-      </form>
+        </form>
+      )}
 
       {message && <p style={{ marginTop: 16 }}>{message}</p>}
-
-      <pre style={{ marginTop: 24, fontSize: 12, whiteSpace: 'pre-wrap' }}>
-        {JSON.stringify(
-          {
-            origin: typeof window !== 'undefined' ? window.location.origin : null,
-            supabaseUrl,
-          },
-          null,
-          2
-        )}
-      </pre>
-
-      {debugResult && (
-        <pre style={{ marginTop: 16, fontSize: 12, whiteSpace: 'pre-wrap' }}>
-          {debugResult}
-        </pre>
-      )}
     </main>
   )
 }
