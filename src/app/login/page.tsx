@@ -28,22 +28,32 @@ export default function LoginPage() {
     checkSession()
   }, [router])
 
-  const testSettingsFetch = async () => {
-    setDebugResult('Testing /auth/v1/settings ...')
+  const testOtpDirect = async () => {
+    setDebugResult('Testing direct POST /auth/v1/otp ...')
+
     try {
-      const res = await fetch(`${supabaseUrl}/auth/v1/settings`, {
+      const res = await fetch(`${supabaseUrl}/auth/v1/otp`, {
+        method: 'POST',
         headers: {
+          'Content-Type': 'application/json',
           apikey: supabaseKey,
         },
+        body: JSON.stringify({
+          email,
+          create_user: true,
+          gotrue_meta_security: {},
+          code_challenge_method: 's256',
+          data: {},
+        }),
       })
 
       const text = await res.text()
-      setDebugResult(`settings status=${res.status}\n${text}`)
-      console.log('settings response', res.status, text)
+      setDebugResult(`otp status=${res.status}\n${text}`)
+      console.log('direct otp response', res.status, text)
     } catch (err) {
-      console.error('settings fetch failed', err)
+      console.error('direct otp failed', err)
       setDebugResult(
-        `settings fetch failed: ${err instanceof Error ? err.message : 'Unknown error'}`
+        `direct otp failed: ${err instanceof Error ? err.message : 'Unknown error'}`
       )
     }
   }
@@ -99,33 +109,34 @@ export default function LoginPage() {
           }}
         />
 
-        <button
-          type="submit"
-          disabled={loading}
-          style={{
-            padding: '12px 16px',
-            borderRadius: 8,
-            border: 'none',
-            cursor: 'pointer',
-            marginRight: 12,
-          }}
-        >
-          {loading ? 'Mengirim...' : 'Kirim Magic Link'}
-        </button>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          <button
+            type="submit"
+            disabled={loading}
+            style={{
+              padding: '12px 16px',
+              borderRadius: 8,
+              border: 'none',
+              cursor: 'pointer',
+            }}
+          >
+            {loading ? 'Mengirim...' : 'Kirim Magic Link'}
+          </button>
 
-        <button
-          type="button"
-          onClick={testSettingsFetch}
-          style={{
-            padding: '12px 16px',
-            borderRadius: 8,
-            border: '1px solid #ccc',
-            cursor: 'pointer',
-            background: 'white',
-          }}
-        >
-          Test Supabase Fetch
-        </button>
+          <button
+            type="button"
+            onClick={testOtpDirect}
+            style={{
+              padding: '12px 16px',
+              borderRadius: 8,
+              border: '1px solid #ccc',
+              cursor: 'pointer',
+              background: 'white',
+            }}
+          >
+            Test Direct OTP
+          </button>
+        </div>
       </form>
 
       {message && <p style={{ marginTop: 16 }}>{message}</p>}
@@ -134,11 +145,7 @@ export default function LoginPage() {
         {JSON.stringify(
           {
             origin: typeof window !== 'undefined' ? window.location.origin : null,
-            hasUrl: !!supabaseUrl,
-            hasAnonKey: !!supabaseKey,
             supabaseUrl,
-            keyPrefix: supabaseKey?.slice(0, 20) ?? null,
-            keyLength: supabaseKey?.length ?? 0,
           },
           null,
           2
