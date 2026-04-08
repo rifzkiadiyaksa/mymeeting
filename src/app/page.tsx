@@ -1,23 +1,31 @@
-export default function Home() {
+'use client'
+
+import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { supabase } from '../lib/supabase/client'
+
+export default function HomePage() {
+  const router = useRouter()
+
+  useEffect(() => {
+    const checkSession = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+
+      if (session) {
+        router.replace('/dashboard')
+      } else {
+        router.replace('/login')
+      }
+    }
+
+    checkSession()
+  }, [router])
+
   return (
     <main style={{ padding: 40 }}>
-      <h1>My Meeting App 🚀</h1>
-      <p>Aplikasi meeting sedang dibangun.</p>
-
-      <a
-        href="/login"
-        style={{
-          display: 'inline-block',
-          marginTop: 20,
-          padding: '12px 16px',
-          border: '1px solid #ccc',
-          borderRadius: 8,
-          textDecoration: 'none',
-          color: 'black',
-        }}
-      >
-        Login
-      </a>
+      <p>Loading...</p>
     </main>
   )
 }
