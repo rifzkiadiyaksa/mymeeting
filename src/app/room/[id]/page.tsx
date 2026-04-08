@@ -16,11 +16,30 @@ type Room = {
   created_at: string
 }
 
+type Participant = {
+  id: string
+  user_email: string | null
+  joined_at: string
+}
+
 export default function RoomPage({ params }: RoomPageProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [room, setRoom] = useState<Room | null>(null)
   const [userEmail, setUserEmail] = useState<string | null>(null)
+  const [participants, setParticipants] = useState<Participant[]>([])
+
+  const fetchParticipants = async () => {
+    const { data, error } = await supabase
+      .from('room_participants')
+      .select('*')
+      .eq('room_id', params.id)
+      .order('joined_at', { ascending: true })
+
+    if (!error && data) {
+      setParticipants(data)
+    }
+  }
 
   useEffect(() => {
     const loadRoom = async () => {
@@ -47,6 +66,14 @@ export default function RoomPage({ params }: RoomPageProps) {
       }
 
       setRoom(data)
+
+      await supabase.from('room_participants').insert({
+        room_id: params.id,
+        user_id: session.user.id,
+        user_email: session.user.email ?? null,
+      })
+
+      await fetchParticipants()
       setLoading(false)
     }
 
@@ -89,49 +116,26 @@ export default function RoomPage({ params }: RoomPageProps) {
         <p>Area ini nanti dipakai untuk video grid, mic/cam controls, dan screen share.</p>
       </div>
 
-      <div
-        style={{
-          marginTop: 24,
-          display: 'flex',
-          gap: 12,
-          flexWrap: 'wrap',
-        }}
-      >
-        <button
-          style={{
-            padding: '10px 14px',
-            borderRadius: 8,
-            border: '1px solid #ccc',
-            background: 'white',
-            cursor: 'pointer',
-          }}
-        >
-          Toggle Mic
-        </button>
+      <div style={{ marginTop: 24 }}>
+        <h2>Participants</h2>
 
-        <button
-          style={{
-            padding: '10px 14px',
-            borderRadius: 8,
-            border: '1px solid #ccc',
-            background: 'white',
-            cursor: 'pointer',
-          }}
-        >
-          Toggle Camera
-        </button>
-
-        <button
-          style={{
-            padding: '10px 14px',
-            borderRadius: 8,
-            border: '1px solid #ccc',
-            background: 'white',
-            cursor: 'pointer',
-          }}
-        >
-          Share Screen
-        </button>
+        {participants.length === 0 ? (
+          <p>Belum ada participant.</p>
+        ) : (
+          participants.map((participant) => (
+            <div
+              key={participant.id}
+              style={{
+                marginBottom: 8,
+                padding: 10,
+                border: '1px solid #ddd',
+                borderRadius: 8,
+              }}
+            >
+              {participant.user_email ?? 'Unknown user'}
+            </div>
+          ))
+        )}
       </div>
 
       <a
